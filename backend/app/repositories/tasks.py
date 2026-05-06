@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.models import TaskRecord
 from app.schemas import AppendInputsRequest, CreateTaskRequest, TaskResponse
+from app.services.recommendation_service import recommend_companies
 
 
 class TaskRepository:
@@ -11,6 +12,10 @@ class TaskRepository:
         self.db = db
 
     def create(self, request: CreateTaskRequest) -> TaskResponse:
+        report = {}
+        if request.mode == "intent":
+            report["company_options"] = recommend_companies(request.intent)
+
         record = TaskRecord(
             mode=request.mode,
             status="pending",
@@ -21,6 +26,7 @@ class TaskRepository:
             jd_text=request.jd_text,
             resume_summary=request.resume_summary,
             concern_questions=json.dumps(request.concern_questions),
+            report_payload=json.dumps(report),
         )
         self.db.add(record)
         self.db.commit()

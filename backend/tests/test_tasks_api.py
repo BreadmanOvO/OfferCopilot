@@ -41,3 +41,17 @@ def test_get_task(client):
 def test_get_task_not_found(client):
     response = client.get("/tasks/99999")
     assert response.status_code == 404
+
+
+def test_create_intent_task_returns_company_options(client):
+    response = client.post(
+        "/tasks",
+        json={
+            "mode": "intent",
+            "intent": {"city": "Shanghai", "target_role": "LLM Engineer"},
+            "company_input": {},
+        },
+    )
+    data = response.json()
+    assert data["report"]["company_options"]
+    assert len(data["report"]["company_options"]) >= 1
