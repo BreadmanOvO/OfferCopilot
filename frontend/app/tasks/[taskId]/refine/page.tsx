@@ -27,13 +27,13 @@ export default function RefinePage() {
 
   return (
     <main style={{ display: "grid", gap: 24, padding: 32, maxWidth: 800, margin: "0 auto" }}>
-      <h1>Supplement Information</h1>
-      <p>Provide additional links or JD text to improve the analysis.</p>
+      <h1>补充信息</h1>
+      <p>提供额外链接或职位描述以改善分析质量。</p>
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
-        <textarea value={userLinks} onChange={(e) => setUserLinks(e.target.value)} placeholder="Company/JD links (one per line)" />
-        <textarea value={jdText} onChange={(e) => setJdText(e.target.value)} placeholder="Paste additional JD text" />
+        <textarea value={userLinks} onChange={(e) => setUserLinks(e.target.value)} placeholder="公司/职位描述链接（每行一个）" />
+        <textarea value={jdText} onChange={(e) => setJdText(e.target.value)} placeholder="粘贴额外的职位描述内容" />
         <button type="submit" disabled={loading}>
-          {loading ? "Processing..." : "Submit and continue analysis"}
+          {loading ? "处理中..." : "提交并继续分析"}
         </button>
       </form>
     </main>
