@@ -5,7 +5,7 @@ export function SourcesView({ sources }: { sources: Source[] }) {
 
   return (
     <section>
-      <h2>Sources ({sources.length})</h2>
+      <h2>参考来源 ({sources.length})</h2>
       <ul>
         {sources.map((source) => (
           <li key={source.url}>
