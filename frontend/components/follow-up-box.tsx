@@ -15,10 +15,10 @@ export function FollowUpBox({ taskId }: { taskId: number }) {
 
   return (
     <section>
-      <h2>Follow-up</h2>
+      <h2>追问</h2>
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: 8 }}>
-        <textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ask a follow-up question" />
-        <button type="submit">Ask</button>
+        <textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="输入你的问题..." />
+        <button type="submit">提问</button>
       </form>
       {answer ? <p>{answer}</p> : null}
     </section>
