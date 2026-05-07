@@ -323,13 +323,15 @@ export function IntentForm({
 }) {
   const [cities, setCities] = useState<string[]>([]);
   const [technicalField, setTechnicalField] = useState("");
+  const [customField, setCustomField] = useState("");
   const [targetRoles, setTargetRoles] = useState<string[]>([]);
   const [companyTypes, setCompanyTypes] = useState<string[]>([]);
 
-  /* when category changes, clear target roles */
+  /* when category changes, clear target roles and custom field */
   const handleCategoryChange = useCallback((label: string) => {
     setTechnicalField(label);
     setTargetRoles([]);
+    if (label !== "其他") setCustomField("");
   }, []);
 
   /* toggle company type tag */
@@ -347,7 +349,7 @@ export function IntentForm({
       mode: "intent",
       intent: {
         city: cities.join(","),
-        technical_field: technicalField,
+        technical_field: technicalField === "其他" && customField.trim() ? customField.trim() : technicalField,
         target_role: targetRoles.join(","),
         company_type: companyTypes.join(","),
       },
@@ -378,6 +380,14 @@ export function IntentForm({
             </option>
           ))}
         </select>
+        {technicalField === "其他" && (
+          <input
+            style={{ ...styles.textInput, marginTop: 8 }}
+            value={customField}
+            onChange={(e) => setCustomField(e.target.value)}
+            placeholder="请输入自定义技术方向"
+          />
+        )}
       </div>
 
       {/* ---- 目标职位 ---- */}
