@@ -323,13 +323,13 @@ export function IntentForm({
 }) {
   const [cities, setCities] = useState<string[]>([]);
   const [technicalField, setTechnicalField] = useState("");
-  const [targetRole, setTargetRole] = useState("");
+  const [targetRoles, setTargetRoles] = useState<string[]>([]);
   const [companyTypes, setCompanyTypes] = useState<string[]>([]);
 
-  /* when category changes, clear target role */
+  /* when category changes, clear target roles */
   const handleCategoryChange = useCallback((label: string) => {
     setTechnicalField(label);
-    setTargetRole("");
+    setTargetRoles([]);
   }, []);
 
   /* toggle company type tag */
@@ -348,7 +348,7 @@ export function IntentForm({
       intent: {
         city: cities.join(","),
         technical_field: technicalField,
-        target_role: targetRole,
+        target_role: targetRoles.join(","),
         company_type: companyTypes.join(","),
       },
       company_input: {},
@@ -383,23 +383,39 @@ export function IntentForm({
       {/* ---- 目标职位 ---- */}
       <div>
         <label style={styles.label}>目标职位</label>
-        <input
-          style={styles.textInput}
-          value={targetRole}
-          onChange={(e) => setTargetRole(e.target.value)}
-          placeholder="输入或选择目标职位"
-        />
+        {targetRoles.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+            {targetRoles.map((role) => (
+              <span key={role} style={styles.tag}>
+                {role}
+                <button
+                  type="button"
+                  style={styles.tagRemove}
+                  onClick={() =>
+                    setTargetRoles((prev) => prev.filter((r) => r !== role))
+                  }
+                >
+                  x
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         {roleSuggestions.length > 0 && (
-          <div style={{ ...styles.tagButtonRow, marginTop: 8 }}>
+          <div style={styles.tagButtonRow}>
             {roleSuggestions.map((title) => (
               <button
                 key={title}
                 type="button"
                 style={
-                  targetRole === title ? styles.tagBtnActive : styles.tagBtn
+                  targetRoles.includes(title) ? styles.tagBtnActive : styles.tagBtn
                 }
                 onClick={() =>
-                  setTargetRole((prev) => (prev === title ? "" : title))
+                  setTargetRoles((prev) =>
+                    prev.includes(title)
+                      ? prev.filter((r) => r !== title)
+                      : [...prev, title]
+                  )
                 }
               >
                 {title}
