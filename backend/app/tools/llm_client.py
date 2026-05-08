@@ -100,7 +100,9 @@ class LLMClient:
             raise RuntimeError(f"LLM API request failed: {e}") from e
 
         try:
-            return data["choices"][0]["message"]["content"]
+            msg = data["choices"][0]["message"]
+            # Some reasoning models return 'reasoning' instead of 'content'
+            return msg.get("content") or msg.get("reasoning") or ""
         except (KeyError, IndexError) as e:
             logger.error("Unexpected LLM response: %s", data)
             raise RuntimeError(f"Unexpected LLM response: {data}") from e
