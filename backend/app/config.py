@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     fetch_timeout_seconds: int = 15
     min_sources_for_confident_report: int = 3
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 settings = Settings()
