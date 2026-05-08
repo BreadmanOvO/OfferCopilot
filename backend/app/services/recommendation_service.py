@@ -1,6 +1,14 @@
+from __future__ import annotations
+
+import logging
 from typing import Any
 
-# Mock company database grouped by type
+from app.tools.llm_client import llm
+
+logger = logging.getLogger(__name__)
+
+
+# Mock company database grouped by type (fallback)
 _COMPANIES: dict[str, list[dict[str, str]]] = {
     "互联网大厂": [
         {"name": "字节跳动", "desc": "全球化的科技公司，旗下有抖音、今日头条等产品"},
@@ -43,7 +51,6 @@ _COMPANIES: dict[str, list[dict[str, str]]] = {
     ],
 }
 
-# Fallback companies when type is "不限" or not matched
 _DEFAULT_COMPANIES = [
     {"name": "字节跳动", "desc": "全球化的科技公司，旗下有抖音、今日头条等产品"},
     {"name": "腾讯", "desc": "社交与游戏领域的巨头，微信生态核心"},
@@ -54,16 +61,75 @@ _DEFAULT_COMPANIES = [
 
 
 def recommend_companies(intent: dict[str, Any]) -> list[dict[str, str]]:
-    """Return mock company recommendations based on user intent.
+    """Return company recommendations based on user intent.
 
-    This is a placeholder until LLM integration is added.
+    Uses LLM when configured, falls back to hardcoded database.
     """
+    # Try LLM-powered recommendations first
+    if llm.is_configured:
+        try:
+            return _llm_recommend(intent)
+        except Exception as e:
+            logger.warning("LLM recommendation failed, falling back to database: %s", e)
+
+    # Fallback: hardcoded database
+    return _fallback_recommend(intent)
+
+
+def _llm_recommend(intent: dict[str, Any]) -> list[dict[str, str]]:
     company_type = intent.get("company_type", "")
     field = intent.get("technical_field", "")
     role = intent.get("target_role", "")
     city = intent.get("city", "")
 
-    # Pick companies by type
+    context_parts: list[str] = []
+    if field:
+        context_parts.append(f"技术方向: {field}")
+    if role:
+        context_parts.append(f"目标职位: {role}")
+    if company_type:
+        context_parts.append(f"期望公司类型: {company_type}")
+    if city:
+        context_parts.append(f"意向城市: {city}")
+
+    context_str = "\n".join(context_parts) if context_parts else "无特定偏好"
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "你是一个资深的求职顾问。根据用户的求职意向，推荐5家适合的公司。\n"
+                "请用JSON格式返回，结构如下：\n"
+                "{\n"
+                '  "companies": [\n'
+                '    {"company_name": "公司名称", "reason": "推荐理由（50-100字）"}\n'
+                "  ]\n"
+                "}\n"
+                "推荐理由要具体说明为什么这家公司适合用户的背景和意向。\n"
+                "只返回JSON，不要其他文字。用中文回答。"
+            ),
+        },
+        {
+            "role": "user",
+            "content": f"我的求职意向：\n{context_str}",
+        },
+    ]
+
+    result = llm.chat_json(messages, max_tokens=1024)
+    companies = result.get("companies", [])
+
+    if not companies:
+        raise RuntimeError("LLM returned empty company list")
+
+    return companies[:5]
+
+
+def _fallback_recommend(intent: dict[str, Any]) -> list[dict[str, str]]:
+    company_type = intent.get("company_type", "")
+    field = intent.get("technical_field", "")
+    role = intent.get("target_role", "")
+    city = intent.get("city", "")
+
     candidates: list[dict[str, str]] = []
     types = [t.strip() for t in company_type.split(",") if t.strip()] if company_type else []
 
@@ -74,7 +140,6 @@ def recommend_companies(intent: dict[str, Any]) -> list[dict[str, str]]:
     if not candidates:
         candidates = list(_DEFAULT_COMPANIES)
 
-    # Deduplicate by name
     seen: set[str] = set()
     unique: list[dict[str, str]] = []
     for c in candidates:
@@ -82,7 +147,6 @@ def recommend_companies(intent: dict[str, Any]) -> list[dict[str, str]]:
             seen.add(c["name"])
             unique.append(c)
 
-    # Build context string
     context_parts: list[str] = []
     if field:
         context_parts.append(f"{field}")

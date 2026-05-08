@@ -9,6 +9,14 @@ class Settings(BaseSettings):
     fetch_timeout_seconds: int = 15
     min_sources_for_confident_report: int = 3
 
+    # LLM settings — compatible with any OpenAI-format API endpoint
+    llm_base_url: str = "https://api.xiaomi.com/v1"
+    llm_api_key: str = ""
+    llm_model: str = "MiMo"
+    llm_max_tokens: int = 4096
+    llm_temperature: float = 0.3
+    llm_timeout_seconds: int = 120
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
