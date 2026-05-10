@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
+from urllib.parse import quote_plus
 
 import httpx
 from bs4 import BeautifulSoup
@@ -10,6 +12,10 @@ from app.config import settings
 from app.tools.llm_client import llm
 
 logger = logging.getLogger(__name__)
+
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+}
 
 
 def generate_search_queries(company: str, intent: dict[str, Any], jd_text: str = "") -> list[str]:
@@ -70,9 +76,9 @@ def _template_queries(company: str, intent: dict[str, Any], jd_text: str = "") -
     role = intent.get("target_role") or intent.get("role", "")
 
     queries = [
-        f"{company} company overview",
-        f"{company} careers jobs",
-        f"{company} recruitment",
+        f"{company} 公司概况",
+        f"{company} 招聘",
+        f"{company} 怎么样",
     ]
 
     if city:
@@ -83,18 +89,79 @@ def _template_queries(company: str, intent: dict[str, Any], jd_text: str = "") -
     return queries
 
 
-def search_ddg(query: str) -> list[dict[str, str]]:
-    url = "https://html.duckduckgo.com/html/"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    }
-    try:
-        response = httpx.post(url, data={"q": query}, headers=headers, timeout=settings.fetch_timeout_seconds, follow_redirects=True)
-        response.raise_for_status()
-    except Exception:
-        return []
+def search(query: str) -> list[dict[str, str]]:
+    """Search using available engines with fallback.
 
-    soup = BeautifulSoup(response.text, "lxml")
+    Priority: Sogou -> Google -> DuckDuckGo
+    """
+    for engine in [_search_sogou, _search_google, _search_ddg]:
+        try:
+            results = engine(query)
+            if results:
+                return results
+        except Exception as e:
+            logger.debug("Search engine %s failed: %s", engine.__name__, e)
+    return []
+
+
+def _search_sogou(query: str) -> list[dict[str, str]]:
+    """Search via Sogou (搜狗) — best for Chinese queries."""
+    url = f"https://www.sogou.com/web?query={quote_plus(query)}"
+    resp = httpx.get(url, headers=_HEADERS, timeout=settings.fetch_timeout_seconds, follow_redirects=True)
+    resp.raise_for_status()
+
+    soup = BeautifulSoup(resp.text, "lxml")
+    results = []
+
+    for item in soup.select(".vrwrap, .rb")[:settings.search_max_results]:
+        link = item.select_one("h3 a")
+        if not link:
+            continue
+        title = link.get_text(strip=True)
+        href = link.get("href", "")
+        snippet_el = item.select_one(".str_info, .space-txt, .ft")
+        snippet = snippet_el.get_text(strip=True) if snippet_el else ""
+
+        if title and href:
+            if href.startswith("/"):
+                href = f"https://www.sogou.com{href}"
+            results.append({"title": title, "url": href, "snippet": snippet})
+
+    return results
+
+
+def _search_google(query: str) -> list[dict[str, str]]:
+    """Search via Google."""
+    url = f"https://www.google.com/search?q={quote_plus(query)}&num={settings.search_max_results}"
+    resp = httpx.get(url, headers=_HEADERS, timeout=settings.fetch_timeout_seconds, follow_redirects=True)
+    resp.raise_for_status()
+
+    soup = BeautifulSoup(resp.text, "lxml")
+    results = []
+
+    for item in soup.select("div.g")[:settings.search_max_results]:
+        link = item.select_one("a")
+        if not link:
+            continue
+        title_el = item.select_one("h3")
+        title = title_el.get_text(strip=True) if title_el else ""
+        href = link.get("href", "")
+        snippet_el = item.select_one("div.VwiC3b, span.aCOpRe")
+        snippet = snippet_el.get_text(strip=True) if snippet_el else ""
+
+        if title and href and href.startswith("http"):
+            results.append({"title": title, "url": href, "snippet": snippet})
+
+    return results
+
+
+def _search_ddg(query: str) -> list[dict[str, str]]:
+    """Search via DuckDuckGo HTML endpoint (fallback)."""
+    url = "https://html.duckduckgo.com/html/"
+    resp = httpx.post(url, data={"q": query}, headers=_HEADERS, timeout=settings.fetch_timeout_seconds, follow_redirects=True)
+    resp.raise_for_status()
+
+    soup = BeautifulSoup(resp.text, "lxml")
     results = []
 
     for link in soup.select(".result__a")[:settings.search_max_results]:
@@ -108,6 +175,16 @@ def search_ddg(query: str) -> list[dict[str, str]]:
                 snippet = snippet_tag.get_text(strip=True)
 
         if title and href:
+            # DDG redirect URLs: //duckduckgo.com/l/?uddg=...
+            if "uddg=" in href:
+                from urllib.parse import unquote, parse_qs, urlparse
+                parsed = urlparse(href if href.startswith("http") else f"https:{href}")
+                qs = parse_qs(parsed.query)
+                href = unquote(qs.get("uddg", [href])[0])
             results.append({"title": title, "url": href, "snippet": snippet})
 
     return results
+
+
+# Backward-compatible alias
+search_ddg = search
