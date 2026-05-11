@@ -44,9 +44,11 @@ export default function IntentPage() {
         padding: "40px 24px",
       }}
     >
-      {/* Back button */}
+      {/* Back button — context-aware */}
       <button
-        onClick={() => router.push("/")}
+        onClick={() =>
+          companyOptions ? setCompanyOptions(null) : router.push("/")
+        }
         style={{
           background: "none",
           border: "none",
@@ -57,7 +59,7 @@ export default function IntentPage() {
           marginBottom: 24,
         }}
       >
-        ← 返回首页
+        {companyOptions ? "← 返回上一步" : "← 返回首页"}
       </button>
 
       {/* Title */}
@@ -87,7 +89,10 @@ export default function IntentPage() {
 
       {/* Company options or form */}
       {companyOptions ? (
-        <CompanyOptions options={companyOptions} onSelect={handleSelectCompany} />
+        <CompanyOptions
+          options={companyOptions}
+          onSelect={handleSelectCompany}
+        />
       ) : (
         <IntentForm onSubmit={handleSubmit} />
       )}

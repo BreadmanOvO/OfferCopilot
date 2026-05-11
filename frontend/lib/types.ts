@@ -17,6 +17,18 @@ export type Source = {
   source_type: string;
 };
 
+export type JobPosition = {
+  title: string;
+  url: string;
+  location: string;
+  department: string;
+};
+
+export type CompanyJobsResponse = {
+  recruit_url: string;
+  positions: JobPosition[];
+};
+
 export type TaskResponse = {
   id: number;
   status: TaskStatus;

@@ -1,4 +1,4 @@
-import { TaskResponse } from "./types";
+import { CompanyJobsResponse, TaskResponse } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -44,4 +44,11 @@ export async function sendFollowUp(taskId: number, question: string): Promise<{ 
     body: JSON.stringify({ question }),
   });
   return handleResponse<{ answer: string }>(response);
+}
+
+export async function getCompanyJobs(companyName: string): Promise<CompanyJobsResponse> {
+  const response = await fetch(
+    `${API_BASE}/tasks/jobs/${encodeURIComponent(companyName)}`
+  );
+  return handleResponse<CompanyJobsResponse>(response);
 }

@@ -33,6 +33,18 @@ class AppendInputsRequest(BaseModel):
     concern_questions: list[str] = Field(default_factory=list)
 
 
+class JobPosition(BaseModel):
+    title: str
+    url: str = ""
+    location: str = ""
+    department: str = ""
+
+
+class CompanyJobsResponse(BaseModel):
+    recruit_url: str = ""
+    positions: list[JobPosition] = Field(default_factory=list)
+
+
 class TaskResponse(BaseModel):
     id: int
     status: TaskStatus

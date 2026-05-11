@@ -3,10 +3,18 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.repositories.tasks import TaskRepository
-from app.schemas import AppendInputsRequest, CreateTaskRequest, TaskResponse
+from app.schemas import AppendInputsRequest, CompanyJobsResponse, CreateTaskRequest, TaskResponse
 from app.workflows.task_workflow import run_task_workflow
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+
+@router.get("/jobs/{company_name}", response_model=CompanyJobsResponse)
+def get_company_jobs(company_name: str) -> CompanyJobsResponse:
+    from app.services.job_listing_service import fetch_company_jobs
+
+    result = fetch_company_jobs(company_name)
+    return CompanyJobsResponse(**result)
 
 
 @router.post("", response_model=TaskResponse)
