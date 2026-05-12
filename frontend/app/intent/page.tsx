@@ -6,12 +6,29 @@ import { IntentForm } from "../../components/intent-form";
 import { CompanyOptions } from "../../components/company-options";
 import { createTask } from "../../lib/api";
 
+type IntentFormDraft = {
+  cities: string[];
+  technicalField: string;
+  customField: string;
+  targetRoles: string[];
+  companyTypes: string[];
+};
+
+const INITIAL_FORM_DRAFT: IntentFormDraft = {
+  cities: [],
+  technicalField: "",
+  customField: "",
+  targetRoles: [],
+  companyTypes: [],
+};
+
 export default function IntentPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [companyOptions, setCompanyOptions] = useState<
     Array<{ company_name: string; reason: string }> | null
   >(null);
+  const [formDraft, setFormDraft] = useState<IntentFormDraft>(INITIAL_FORM_DRAFT);
 
   async function handleSubmit(payload: Record<string, unknown>) {
     setError(null);
@@ -94,7 +111,11 @@ export default function IntentPage() {
           onSelect={handleSelectCompany}
         />
       ) : (
-        <IntentForm onSubmit={handleSubmit} />
+        <IntentForm
+          initialValue={formDraft}
+          onDraftChange={setFormDraft}
+          onSubmit={handleSubmit}
+        />
       )}
     </main>
   );

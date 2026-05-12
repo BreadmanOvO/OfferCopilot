@@ -317,15 +317,47 @@ function CityDropdown({
 /* ------------------------------------------------------------------ */
 
 export function IntentForm({
+  initialValue,
+  onDraftChange,
   onSubmit,
 }: {
+  initialValue?: {
+    cities: string[];
+    technicalField: string;
+    customField: string;
+    targetRoles: string[];
+    companyTypes: string[];
+  };
+  onDraftChange?: (draft: {
+    cities: string[];
+    technicalField: string;
+    customField: string;
+    targetRoles: string[];
+    companyTypes: string[];
+  }) => void;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }) {
-  const [cities, setCities] = useState<string[]>([]);
-  const [technicalField, setTechnicalField] = useState("");
-  const [customField, setCustomField] = useState("");
-  const [targetRoles, setTargetRoles] = useState<string[]>([]);
-  const [companyTypes, setCompanyTypes] = useState<string[]>([]);
+  const [cities, setCities] = useState<string[]>(initialValue?.cities ?? []);
+  const [technicalField, setTechnicalField] = useState(
+    initialValue?.technicalField ?? ""
+  );
+  const [customField, setCustomField] = useState(initialValue?.customField ?? "");
+  const [targetRoles, setTargetRoles] = useState<string[]>(
+    initialValue?.targetRoles ?? []
+  );
+  const [companyTypes, setCompanyTypes] = useState<string[]>(
+    initialValue?.companyTypes ?? []
+  );
+
+  useEffect(() => {
+    onDraftChange?.({
+      cities,
+      technicalField,
+      customField,
+      targetRoles,
+      companyTypes,
+    });
+  }, [cities, technicalField, customField, targetRoles, companyTypes, onDraftChange]);
 
   /* when category changes, clear target roles and custom field */
   const handleCategoryChange = useCallback((label: string) => {
