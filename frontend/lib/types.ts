@@ -22,11 +22,16 @@ export type JobPosition = {
   url: string;
   location: string;
   department: string;
+  description: string;
+  requirements: string;
+  source: string;
 };
 
 export type CompanyJobsResponse = {
   recruit_url: string;
   positions: JobPosition[];
+  message: string;
+  confidence: "low" | "medium" | "high" | string;
 };
 
 export type TaskResponse = {

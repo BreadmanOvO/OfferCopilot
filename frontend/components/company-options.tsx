@@ -195,6 +195,17 @@ const s = {
     color: "#9ca3af",
     fontSize: 14,
   } as React.CSSProperties,
+  statusMessage: {
+    fontSize: 13,
+    color: "#6b7280",
+    backgroundColor: "#f9fafb",
+    border: "1px solid #e5e7eb",
+    borderRadius: 8,
+    padding: "10px 12px",
+    marginTop: 14,
+    marginBottom: 12,
+    lineHeight: 1.5,
+  } as React.CSSProperties,
 };
 
 /* ------------------------------------------------------------------ */
@@ -242,6 +253,22 @@ function JobDetailOverlay({
         {position.department && (
           <p style={s.detailMeta}>
             <strong>部门:</strong> {position.department}
+          </p>
+        )}
+
+        {position.description && (
+          <p style={s.detailMeta}>
+            <strong>岗位描述:</strong> {position.description}
+          </p>
+        )}
+        {position.requirements && (
+          <p style={s.detailMeta}>
+            <strong>岗位要求:</strong> {position.requirements}
+          </p>
+        )}
+        {position.source && (
+          <p style={s.detailMeta}>
+            <strong>信息来源:</strong> {position.source}
           </p>
         )}
 
@@ -341,9 +368,11 @@ function CompanyCard({
   jobsData,
   isLoading,
   selectedPosition,
+  error,
   onExpand,
   onCollapse,
   onSelectPosition,
+  onClearSelectedPosition,
   onSelectCompany,
 }: {
   option: { company_name: string; reason: string };
@@ -351,9 +380,11 @@ function CompanyCard({
   jobsData: CompanyJobsResponse | undefined;
   isLoading: boolean;
   selectedPosition: JobPosition | null;
+  error: string;
   onExpand: () => void;
   onCollapse: () => void;
   onSelectPosition: (pos: JobPosition) => void;
+  onClearSelectedPosition: () => void;
   onSelectCompany: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -401,12 +432,22 @@ function CompanyCard({
         <>
           {isLoading ? (
             <div style={s.loading}>正在加载职位信息...</div>
+          ) : error ? (
+            <div style={s.emptyHint}>{error}</div>
           ) : jobsData ? (
-            <PositionList
-              positions={jobsData.positions}
-              onSelect={onSelectPosition}
-              onBack={onCollapse}
-            />
+            <>
+              {jobsData.message && (
+                <p style={s.statusMessage}>
+                  {jobsData.message}
+                  {jobsData.confidence && `（可信度: ${jobsData.confidence}）`}
+                </p>
+              )}
+              <PositionList
+                positions={jobsData.positions}
+                onSelect={onSelectPosition}
+                onBack={onCollapse}
+              />
+            </>
           ) : null}
         </>
       )}
@@ -416,7 +457,7 @@ function CompanyCard({
         <JobDetailOverlay
           position={selectedPosition}
           companyName={option.company_name}
-          onClose={() => onSelectPosition(null as unknown as JobPosition)}
+          onClose={onClearSelectedPosition}
         />
       )}
     </div>
@@ -440,6 +481,7 @@ export function CompanyOptions({
   const [selectedPosition, setSelectedPosition] = useState<JobPosition | null>(null);
   const [jobsData, setJobsData] = useState<Record<string, CompanyJobsResponse>>({});
   const [loadingJobs, setLoadingJobs] = useState<Record<string, boolean>>({});
+  const [jobsError, setJobsError] = useState<Record<string, string>>({});
 
   async function handleExpand(companyName: string) {
     // Toggle if already expanded
@@ -458,11 +500,11 @@ export function CompanyOptions({
       try {
         const data = await getCompanyJobs(companyName);
         setJobsData((prev) => ({ ...prev, [companyName]: data }));
+        setJobsError((prev) => ({ ...prev, [companyName]: "" }));
       } catch (err) {
-        // Set empty data on error
-        setJobsData((prev) => ({
+        setJobsError((prev) => ({
           ...prev,
-          [companyName]: { recruit_url: "", positions: [] },
+          [companyName]: "职位信息加载失败，请稍后重试",
         }));
       } finally {
         setLoadingJobs((prev) => ({ ...prev, [companyName]: false }));
@@ -494,12 +536,14 @@ export function CompanyOptions({
           selectedPosition={
             expandedCompany === option.company_name ? selectedPosition : null
           }
+          error={jobsError[option.company_name] ?? ""}
           onExpand={() => handleExpand(option.company_name)}
           onCollapse={() => {
             setExpandedCompany(null);
             setSelectedPosition(null);
           }}
           onSelectPosition={handleSelectPosition}
+          onClearSelectedPosition={() => setSelectedPosition(null)}
           onSelectCompany={() => onSelect(option.company_name)}
         />
       ))}
