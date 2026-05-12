@@ -7,6 +7,7 @@ OfferCopilotDocs/
 frontend/node_modules/
 frontend/.next/
 frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo
 
 # Backend
 backend/.venv/
@@ -14,3 +15,9 @@ backend/__pycache__/
 backend/**/__pycache__/
 backend/*.db
 backend/.env
+*.db
+
+# Local tool/runtime artifacts
+.playwright-mcp/
+.superpowers/
+landing-page.png
