@@ -38,11 +38,16 @@ class JobPosition(BaseModel):
     url: str = ""
     location: str = ""
     department: str = ""
+    description: str = ""
+    requirements: str = ""
+    source: str = ""
 
 
 class CompanyJobsResponse(BaseModel):
     recruit_url: str = ""
     positions: list[JobPosition] = Field(default_factory=list)
+    message: str = ""
+    confidence: str = "low"
 
 
 class TaskResponse(BaseModel):

@@ -59,7 +59,12 @@ def fetch_company_jobs(company_name: str) -> dict[str, Any]:
     search_results = search(query)
 
     if not search_results:
-        return {"recruit_url": "", "positions": []}
+        return {
+            "recruit_url": "",
+            "positions": [],
+            "message": "未找到招聘相关搜索结果",
+            "confidence": "low",
+        }
 
     # Identify recruitment URL (only resolve the first one for speed)
     recruit_url = _find_recruit_url(company_name, search_results)
@@ -83,7 +88,12 @@ def fetch_company_jobs(company_name: str) -> dict[str, Any]:
             context_parts.append(f"来源: {title}\n链接: {real_url}\n摘要: {snippet}")
 
     if not context_parts:
-        return {"recruit_url": recruit_url, "positions": []}
+        return {
+            "recruit_url": recruit_url,
+            "positions": [],
+            "message": "已找到招聘官网，但搜索结果未包含可提取的岗位摘要",
+            "confidence": "low",
+        }
 
     # Extract jobs via LLM
     if llm.is_configured:
@@ -92,7 +102,12 @@ def fetch_company_jobs(company_name: str) -> dict[str, Any]:
         except Exception as e:
             logger.warning("LLM job extraction failed: %s", e)
 
-    return {"recruit_url": recruit_url, "positions": []}
+    return {
+        "recruit_url": recruit_url,
+        "positions": [],
+        "message": "岗位提取暂时不可用，请先访问招聘官网查看",
+        "confidence": "low",
+    }
 
 
 def _find_recruit_url(company_name: str, results: list[dict[str, str]]) -> str:
@@ -131,10 +146,11 @@ def _llm_extract_jobs(
                 "{\n"
                 '  "recruit_url": "公司招聘官网URL（如有）",\n'
                 '  "positions": [\n'
-                '    {"title": "岗位名称", "url": "岗位详情链接(如有)", "location": "工作城市", "department": "所属部门(如有)"}\n'
+                '    {"title": "岗位名称", "url": "岗位详情链接(如有)", "location": "工作城市", "department": "所属部门(如有)", "description": "岗位描述摘要(如有)", "requirements": "岗位要求摘要(如有)", "source": "信息来源链接(如有)"}\n'
                 "  ]\n"
                 "}\n"
                 "从搜索摘要中提取提到的具体岗位名称。如果摘要中提到了岗位，就提取出来。\n"
+                "如果摘要中没有明确岗位描述或要求，不要编造，填空字符串。\n"
                 "如果找不到具体岗位信息，返回空数组。\n"
                 "只返回JSON，不要其他文字。"
             ),
@@ -156,9 +172,15 @@ def _llm_extract_jobs(
                 "url": str(pos.get("url", "")),
                 "location": str(pos.get("location", "")),
                 "department": str(pos.get("department", "")),
+                "description": str(pos.get("description", "")),
+                "requirements": str(pos.get("requirements", "")),
+                "source": str(pos.get("source", recruit_url or "")),
             })
 
+    resolved_recruit_url = result.get("recruit_url", recruit_url) or recruit_url
     return {
-        "recruit_url": result.get("recruit_url", recruit_url) or recruit_url,
+        "recruit_url": resolved_recruit_url,
         "positions": cleaned_positions,
+        "message": f"已提取 {len(cleaned_positions)} 个岗位" if cleaned_positions else "已找到招聘官网，但未提取到具体岗位",
+        "confidence": "medium" if cleaned_positions else "low",
     }
