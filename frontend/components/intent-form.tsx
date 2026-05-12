@@ -1,12 +1,18 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ALL_CITIES, POPULAR_CITIES } from "../lib/cities";
 import {
   COMPANY_TYPES,
   JOB_CATEGORIES,
   getTitlesByCategory,
 } from "../lib/job-categories";
+import {
+  areIntentFormDraftsEqual,
+  normalizeIntentFormDraft,
+  syncIntentFormDraft,
+  type IntentFormDraft,
+} from "../lib/intent-form-draft";
 
 /* ------------------------------------------------------------------ */
 /*  Styles                                                             */
@@ -321,43 +327,92 @@ export function IntentForm({
   onDraftChange,
   onSubmit,
 }: {
-  initialValue?: {
-    cities: string[];
-    technicalField: string;
-    customField: string;
-    targetRoles: string[];
-    companyTypes: string[];
-  };
-  onDraftChange?: (draft: {
-    cities: string[];
-    technicalField: string;
-    customField: string;
-    targetRoles: string[];
-    companyTypes: string[];
-  }) => void;
+  initialValue?: Partial<IntentFormDraft>;
+  onDraftChange?: (draft: IntentFormDraft) => void;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }) {
-  const [cities, setCities] = useState<string[]>(initialValue?.cities ?? []);
-  const [technicalField, setTechnicalField] = useState(
-    initialValue?.technicalField ?? ""
+  const normalizedInitialValue = useMemo(
+    () => normalizeIntentFormDraft(initialValue),
+    [initialValue]
   );
-  const [customField, setCustomField] = useState(initialValue?.customField ?? "");
-  const [targetRoles, setTargetRoles] = useState<string[]>(
-    initialValue?.targetRoles ?? []
-  );
-  const [companyTypes, setCompanyTypes] = useState<string[]>(
-    initialValue?.companyTypes ?? []
-  );
+  const [draft, setDraft] = useState<IntentFormDraft>(normalizedInitialValue);
 
   useEffect(() => {
-    onDraftChange?.({
-      cities,
-      technicalField,
-      customField,
-      targetRoles,
-      companyTypes,
-    });
-  }, [cities, technicalField, customField, targetRoles, companyTypes, onDraftChange]);
+    setDraft((currentDraft) =>
+      syncIntentFormDraft(currentDraft, normalizedInitialValue)
+    );
+  }, [normalizedInitialValue]);
+
+  useEffect(() => {
+    onDraftChange?.(draft);
+  }, [draft, onDraftChange]);
+
+  const { cities, technicalField, customField, targetRoles, companyTypes } = draft;
+
+  const updateDraft = useCallback(
+    (updater: (currentDraft: IntentFormDraft) => IntentFormDraft) => {
+      setDraft((currentDraft) => {
+        const nextDraft = updater(currentDraft);
+        return areIntentFormDraftsEqual(currentDraft, nextDraft)
+          ? currentDraft
+          : nextDraft;
+      });
+    },
+    []
+  );
+
+  const setCities = useCallback(
+    (nextCities: string[]) => {
+      updateDraft((currentDraft) => ({ ...currentDraft, cities: nextCities }));
+    },
+    [updateDraft]
+  );
+
+  const setTechnicalField = useCallback(
+    (nextTechnicalField: string) => {
+      updateDraft((currentDraft) => ({
+        ...currentDraft,
+        technicalField: nextTechnicalField,
+      }));
+    },
+    [updateDraft]
+  );
+
+  const setCustomField = useCallback(
+    (nextCustomField: string) => {
+      updateDraft((currentDraft) => ({
+        ...currentDraft,
+        customField: nextCustomField,
+      }));
+    },
+    [updateDraft]
+  );
+
+  const setTargetRoles = useCallback(
+    (nextTargetRoles: string[] | ((currentRoles: string[]) => string[])) => {
+      updateDraft((currentDraft) => ({
+        ...currentDraft,
+        targetRoles:
+          typeof nextTargetRoles === "function"
+            ? nextTargetRoles(currentDraft.targetRoles)
+            : nextTargetRoles,
+      }));
+    },
+    [updateDraft]
+  );
+
+  const setCompanyTypes = useCallback(
+    (nextCompanyTypes: string[] | ((currentTypes: string[]) => string[])) => {
+      updateDraft((currentDraft) => ({
+        ...currentDraft,
+        companyTypes:
+          typeof nextCompanyTypes === "function"
+            ? nextCompanyTypes(currentDraft.companyTypes)
+            : nextCompanyTypes,
+      }));
+    },
+    [updateDraft]
+  );
 
   /* when category changes, clear target roles and custom field */
   const handleCategoryChange = useCallback((label: string) => {

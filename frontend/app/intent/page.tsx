@@ -5,22 +5,10 @@ import { useRouter } from "next/navigation";
 import { IntentForm } from "../../components/intent-form";
 import { CompanyOptions } from "../../components/company-options";
 import { createTask } from "../../lib/api";
-
-type IntentFormDraft = {
-  cities: string[];
-  technicalField: string;
-  customField: string;
-  targetRoles: string[];
-  companyTypes: string[];
-};
-
-const INITIAL_FORM_DRAFT: IntentFormDraft = {
-  cities: [],
-  technicalField: "",
-  customField: "",
-  targetRoles: [],
-  companyTypes: [],
-};
+import {
+  INITIAL_INTENT_FORM_DRAFT,
+  type IntentFormDraft,
+} from "../../lib/intent-form-draft";
 
 export default function IntentPage() {
   const router = useRouter();
@@ -28,7 +16,7 @@ export default function IntentPage() {
   const [companyOptions, setCompanyOptions] = useState<
     Array<{ company_name: string; reason: string }> | null
   >(null);
-  const [formDraft, setFormDraft] = useState<IntentFormDraft>(INITIAL_FORM_DRAFT);
+  const [formDraft, setFormDraft] = useState<IntentFormDraft>(INITIAL_INTENT_FORM_DRAFT);
 
   async function handleSubmit(payload: Record<string, unknown>) {
     setError(null);
