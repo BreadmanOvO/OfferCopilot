@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from typing import Any
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -48,6 +49,148 @@ def _resolve_redirect_url(url: str) -> str:
     return url
 
 
+_JOB_KEYWORDS = [
+    "工程师",
+    "开发",
+    "产品",
+    "运营",
+    "实习",
+    "后端",
+    "前端",
+    "算法",
+    "数据",
+    "测试",
+    "backend",
+    "frontend",
+    "engineer",
+    "developer",
+    "manager",
+    "intern",
+]
+
+_NOISE_KEYWORDS = [
+    "登录",
+    "注册",
+    "首页",
+    "关于",
+    "隐私",
+    "条款",
+    "帮助",
+    "校园招聘",
+    "校招",
+]
+
+
+def _clean_text(value: str) -> str:
+    return " ".join(value.split())
+
+
+def _looks_like_job_title(text: str, href: str) -> bool:
+    title = _clean_text(text)
+    if len(title) < 2 or len(title) > 80:
+        return False
+    lowered = f"{title} {href}".lower()
+    if any(keyword in title for keyword in _NOISE_KEYWORDS):
+        return False
+    return any(keyword in lowered for keyword in _JOB_KEYWORDS)
+
+
+def _normalize_url(href: str, base_url: str) -> str:
+    return urljoin(base_url, href)
+
+
+def _extract_positions_from_html(html: str, base_url: str) -> list[dict[str, str]]:
+    soup = BeautifulSoup(html, "lxml")
+    positions: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    for link in soup.find_all("a"):
+        title = _clean_text(link.get_text(" "))
+        href = str(link.get("href") or "")
+        if not href or not _looks_like_job_title(title, href):
+            continue
+
+        url = _normalize_url(href, base_url)
+        key = (title, url)
+        if key in seen:
+            continue
+        seen.add(key)
+        positions.append({
+            "title": title,
+            "url": url,
+            "location": "",
+            "department": "",
+            "description": "",
+            "requirements": "",
+            "source": base_url,
+        })
+
+    return positions[:10]
+
+
+def _fetch_html(url: str) -> str:
+    resp = httpx.get(url, headers=_HEADERS, timeout=settings.fetch_timeout_seconds, follow_redirects=True)
+    resp.raise_for_status()
+    return resp.text
+
+
+def _extract_labeled_value(text: str, labels: list[str]) -> str:
+    stop_pattern = "|".join([
+        "工作地点",
+        "地点",
+        "城市",
+        "岗位描述",
+        "职位描述",
+        "工作职责",
+        "岗位职责",
+        "岗位要求",
+        "任职要求",
+        "职位要求",
+    ])
+    for label in labels:
+        match = re.search(rf"{label}\s*[：:]\s*(.*?)(?=\s*(?:{stop_pattern})\s*[：:]|$)", text)
+        if match:
+            return match.group(1).strip(" 。；;")[:240]
+    return ""
+
+
+def _extract_detail_fields(html: str) -> dict[str, str]:
+    soup = BeautifulSoup(html, "lxml")
+    text = _clean_text(soup.get_text("\n"))
+    return {
+        "location": _extract_labeled_value(text, ["工作地点", "地点", "城市"])[:80],
+        "department": "",
+        "description": _extract_labeled_value(text, ["岗位描述", "职位描述", "工作职责", "岗位职责"]),
+        "requirements": _extract_labeled_value(text, ["岗位要求", "任职要求", "职位要求"]),
+    }
+
+
+def _same_site(left_url: str, right_url: str) -> bool:
+    left_host = urlparse(left_url).netloc
+    right_host = urlparse(right_url).netloc
+    return bool(left_host and right_host and left_host == right_host)
+
+
+def _enrich_positions_from_detail_pages(positions: list[dict[str, str]]) -> list[dict[str, str]]:
+    enriched = [dict(position) for position in positions]
+    for position in enriched[:3]:
+        url = position.get("url", "")
+        source = position.get("source", "")
+        if not url or not source or not _same_site(url, source):
+            continue
+        try:
+            detail_html = _fetch_html(url)
+            fields = _extract_detail_fields(detail_html)
+        except Exception as e:
+            logger.info("Failed to fetch job detail %s: %s", url, e)
+            continue
+        for key, value in fields.items():
+            if value and not position.get(key):
+                position[key] = value
+        position["source"] = url
+    return enriched
+
+
 def fetch_company_jobs(company_name: str) -> dict[str, Any]:
     """Fetch job listings for a company.
 
@@ -70,6 +213,31 @@ def fetch_company_jobs(company_name: str) -> dict[str, Any]:
     recruit_url = _find_recruit_url(company_name, search_results)
     if "sogou.com/link" in recruit_url:
         recruit_url = _resolve_redirect_url(recruit_url)
+
+    crawl_failure_message = ""
+    if recruit_url:
+        try:
+            recruit_html = _fetch_html(recruit_url)
+            positions = _extract_positions_from_html(recruit_html, recruit_url)
+            if positions:
+                enriched_positions = _enrich_positions_from_detail_pages(positions)
+                has_details = any(
+                    position.get("description") or position.get("requirements")
+                    for position in enriched_positions
+                )
+                return {
+                    "recruit_url": recruit_url,
+                    "positions": enriched_positions,
+                    "message": (
+                        f"已从招聘页识别 {len(enriched_positions)} 个岗位，并补充部分详情"
+                        if has_details
+                        else f"已从招聘页识别 {len(enriched_positions)} 个岗位，详情信息可能不完整"
+                    ),
+                    "confidence": "medium",
+                }
+        except Exception as e:
+            logger.info("Failed to fetch recruit page %s: %s", recruit_url, e)
+            crawl_failure_message = "招聘页暂时不可访问，请先访问招聘官网查看"
 
     # Build context from search results (use snippets directly for speed)
     context_parts: list[str] = []
@@ -101,6 +269,14 @@ def fetch_company_jobs(company_name: str) -> dict[str, Any]:
             return _llm_extract_jobs(company_name, recruit_url, context_parts)
         except Exception as e:
             logger.warning("LLM job extraction failed: %s", e)
+
+    if crawl_failure_message:
+        return {
+            "recruit_url": recruit_url,
+            "positions": [],
+            "message": crawl_failure_message,
+            "confidence": "low",
+        }
 
     return {
         "recruit_url": recruit_url,

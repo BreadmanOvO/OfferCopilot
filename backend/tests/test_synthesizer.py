@@ -1,7 +1,12 @@
+import app.tools.synthesizer as synthesizer
 from app.tools.synthesizer import synthesize_research
 
 
-def test_synthesize_with_sufficient_sources():
+def test_synthesize_with_sufficient_sources(monkeypatch):
+    class StubLLM:
+        is_configured = False
+
+    monkeypatch.setattr(synthesizer, "llm", StubLLM())
     sources = [
         {"title": "Company", "url": "https://example.com/1", "snippet": "A"},
         {"title": "Careers", "url": "https://example.com/2", "snippet": "B"},
